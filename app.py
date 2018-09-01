@@ -1,9 +1,8 @@
 import argparse
 import io
 import logging
-
-import ebooklib
-from ebooklib import epub
+import zipfile
+import mimetypes
 
 from PIL import Image
 
@@ -27,51 +26,57 @@ def main():
     if args.image_resize_percent:
         args.image_resize_percent /= 100.0
 
-    book = epub.read_epub(args.in_epub_filepath)
+    with zipfile.ZipFile(args.in_epub_filepath, 'r') as in_book:
+        with zipfile.ZipFile(args.out_epub_filepath, 'w') as out_book:
+            for name in in_book.namelist():
+                with in_book.open(name, 'r') as in_file:
+                    content = in_file.read()
 
-    for item in book.get_items_of_type(ebooklib.ITEM_COVER):
-        _compress_image_item(item, args)
+                    type_, encoding = mimetypes.guess_type(name)
 
-    for item in book.get_items_of_type(ebooklib.ITEM_IMAGE):
-        _compress_image_item(item, args)
+                    if type_:
+                        type_, subtype = type_.split('/')
 
-    epub.write_epub(args.out_epub_filepath, book)
+                        if type_ == 'image':
+                            content = _compress_image(subtype, content, args)
+
+                    out_book.writestr(name, content)
 
 
-def _compress_image_item(item, args):
-    if item.media_type not in {'image/jpeg', 'image/png'}:
-        return
+def _compress_image(subtype, old_content, args):
+    if subtype not in {'jpeg', 'jpg', 'png'}:
+        return old_content
 
-    old_content = item.get_content()
-    if old_content:
-        in_buffer = io.BytesIO(old_content)
-        img = Image.open(in_buffer)
+    in_buffer = io.BytesIO(old_content)
+    img = Image.open(in_buffer)
 
-        if args.image_resize_percent:
-            original_size = img.size
-            new_size = (int(original_size[0] * args.image_resize_percent), int(original_size[1] * args.image_resize_percent))
-            logging.info('old size: %s', original_size)
-            logging.info('new size: %s', new_size)
+    if args.image_resize_percent:
+        original_size = img.size
+        new_size = (int(original_size[0] * args.image_resize_percent), int(original_size[1] * args.image_resize_percent))
+        logging.info('old size: %s', original_size)
+        logging.info('new size: %s', new_size)
 
-            img = img.resize(new_size)
+        img = img.resize(new_size)
 
-        format_ = None
-        params = {}
-        if item.media_type == 'image/jpeg':
-            format_ = 'JPEG'
-            params['quality'] = args.jpeg_quality
-            params['optimize'] = True
-        elif item.media_type == 'image/png':
-            format_ = 'PNG'
-            params['optimize'] = True
+    format_ = None
+    params = {}
+    if subtype == 'jpeg' or subtype == 'jpg':
+        format_ = 'JPEG'
+        params['quality'] = args.jpeg_quality
+        params['optimize'] = True
+    elif subtype == 'png':
+        format_ = 'PNG'
+        params['optimize'] = True
 
-        out_buffer = io.BytesIO()
-        img.save(out_buffer, format_, **params)
+    out_buffer = io.BytesIO()
+    img.save(out_buffer, format_, **params)
 
-        item.content = out_buffer.getvalue()
+    new_content = out_buffer.getvalue()
 
-        logging.info('old content length: %s', len(old_content))
-        logging.info('new content length: %s', len(item.content))
+    logging.info('old content length: %s', len(old_content))
+    logging.info('new content length: %s', len(new_content))
+
+    return new_content
 
 if __name__ == '__main__':
     main()
