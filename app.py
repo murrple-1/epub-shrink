@@ -14,6 +14,7 @@ def main():
     parser.add_argument('-l', '--log-level')
     parser.add_argument('--jpeg-quality', type=int, default=75)
     parser.add_argument('--image-resize-percent', type=int)
+    parser.add_argument('--image-resize-resample')
 
     args = parser.parse_args()
 
@@ -58,7 +59,16 @@ def _compress_image(subtype, old_content, args):
         logging.info('old size: %s', original_size)
         logging.info('new size: %s', new_size)
 
-        img = img.resize(new_size)
+        resample = None
+        if args.image_resize_resample:
+            resample_attr = args.image_resize_resample.upper()
+            if not hasattr(Image, resample_attr):
+                raise ValueError('unknown resample mode: {}'.format(
+                    args.image_resize_resample))
+
+            resample = getattr(Image, resample_attr)
+
+        img = img.resize(new_size, resample)
 
     format_ = None
     params = {}
