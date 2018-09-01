@@ -1,4 +1,5 @@
 import argparse
+import os
 import io
 import logging
 import zipfile
@@ -24,6 +25,16 @@ def main():
             raise ValueError('Invalid log level: {}'.format(args.log_level))
 
         logging.basicConfig(level=log_level_num)
+
+    if not os.path.isfile(args.in_epub_filepath):
+        raise FileNotFoundError(args.in_epub_filepath)
+
+    if os.path.isdir(args.out_epub_filepath):
+        args.out_epub_filepath = os.path.join(
+            args.out_epub_filepath, os.path.basename(args.in_epub_filepath))
+
+    if args.out_epub_filepath == args.in_epub_filepath:
+        raise FileExistsError(args.out_epub_filepath)
 
     if args.image_resize_percent:
         args.image_resize_percent /= 100.0
