@@ -6,6 +6,7 @@ import mimetypes
 
 from PIL import Image
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('in_epub_filepath')
@@ -52,7 +53,8 @@ def _compress_image(subtype, old_content, args):
 
     if args.image_resize_percent:
         original_size = img.size
-        new_size = (int(original_size[0] * args.image_resize_percent), int(original_size[1] * args.image_resize_percent))
+        new_size = (int(original_size[0] * args.image_resize_percent),
+                    int(original_size[1] * args.image_resize_percent))
         logging.info('old size: %s', original_size)
         logging.info('new size: %s', new_size)
 
@@ -77,6 +79,7 @@ def _compress_image(subtype, old_content, args):
     logging.info('new content length: %s', len(new_content))
 
     return new_content
+
 
 if __name__ == '__main__':
     main()
