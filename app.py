@@ -15,6 +15,7 @@ def main():
     parser.add_argument('-l', '--log-level')
     parser.add_argument('--jpeg-quality', type=int, default=75)
     parser.add_argument('--image-resize-percent', type=int)
+    parser.add_argument('--image-max-width', type=int)
     parser.add_argument('--image-resize-resample')
 
     args = parser.parse_args()
@@ -55,6 +56,20 @@ def main():
 
                     out_book.writestr(name, content)
 
+def _resize_image(args__image_resize_resample, new_size, img):
+    logging.info('old size: %s', img.size)
+    logging.info('new size: %s', new_size)
+
+    if args__image_resize_resample:
+        resample_attr = args__image_resize_resample.upper()
+        if not hasattr(Image, resample_attr):
+            raise ValueError('unknown resample mode: {}'.format(
+                args__image_resize_resample))
+
+        resample = getattr(Image, resample_attr)
+        return img.resize(new_size, resample)
+
+    return img.resize(new_size)
 
 def _compress_image(subtype, old_content, args):
     if subtype not in {'jpeg', 'jpg', 'png'}:
@@ -63,23 +78,22 @@ def _compress_image(subtype, old_content, args):
     in_buffer = io.BytesIO(old_content)
     img = Image.open(in_buffer)
 
+    original_size = img.size
+    new_size = original_size
+
     if args.image_resize_percent:
-        original_size = img.size
-        new_size = (int(original_size[0] * args.image_resize_percent),
-                    int(original_size[1] * args.image_resize_percent))
-        logging.info('old size: %s', original_size)
-        logging.info('new size: %s', new_size)
+        new_size = (int(new_size[0] * args.image_resize_percent),
+                    int(new_size[1] * args.image_resize_percent))
 
-        resample = None
-        if args.image_resize_resample:
-            resample_attr = args.image_resize_resample.upper()
-            if not hasattr(Image, resample_attr):
-                raise ValueError('unknown resample mode: {}'.format(
-                    args.image_resize_resample))
+    new_width = new_size[0]
+    if args.image_max_width and new_width > args.image_max_width:
+        downscale_factor = new_width / args.image_max_width
+        new_size = (int(new_size[0] / downscale_factor),
+                    int(new_size[1] / downscale_factor))
 
-            resample = getattr(Image, resample_attr)
-
-        img = img.resize(new_size, resample)
+    should_resize = original_size != new_size
+    if should_resize:
+        img = _resize_image(args.image_resize_resample, new_size, img)
 
     format_ = None
     params = {}
